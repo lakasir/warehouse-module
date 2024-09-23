@@ -1,0 +1,11 @@
+<?php
+
+namespace Modules\Warehouse\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class ProductionBatch extends Model
+{
+    use HasFactory;
+}
