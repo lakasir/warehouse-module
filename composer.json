@@ -1,3 +1,17 @@
 {
-  "name": "lakasir/module"
+    "name": "lakasir/warehouse",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Warehouse\\": "src",
+            "Modules\\Warehouse\\Database\\Factories\\": "database/factories",
+            "Modules\\Warehouse\\Database\\Seeders\\": "database/seeders"
+        }
+    },
+    "authors": [
+        {
+            "name": "lakasir",
+            "email": "lakasirapp@gmail.com",
+            "role": "Developer"
+        }
+    ]
 }
