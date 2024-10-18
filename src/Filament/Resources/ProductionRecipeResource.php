@@ -2,7 +2,7 @@
 
 namespace Modules\Warehouse\Filament\Resources;
 
-use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Lakasir\LakasirModule\Abstracts\ModuleResource;
@@ -15,36 +15,27 @@ class ProductionRecipeResource extends ModuleResource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    protected static ?string $label = 'Production Recipe';
-
     public static function getLabel(): ?string
     {
-        return __(self::$label);
+        return __('Warehouse::app.production_recipe.title');
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            // ->modifyQueryUsing(function () {
-            //     return Product::query()->whereHas('productionRecipes');
-            // })
+            ->modifyQueryUsing(function () {
+                return Product::query()->whereHas('productionRecipeItems');
+            })
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
                     ->translateLabel(),
             ])
-            ->filters([
-                //
-            ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                Action::make('production')
+                    ->icon('heroicon-s-megaphone')
+                    ->label(__('Warehouse::app.production_recipe.production')),
             ]);
     }
 

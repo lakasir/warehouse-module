@@ -20,34 +20,39 @@ class RawMaterialResource extends ModuleResource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    public static function getForm(): array
+    {
+        return [
+            TextInput::make('name')
+                ->translateLabel()
+                ->required(),
+            TextInput::make('sku')
+                ->unique(
+                    ignoreRecord: true
+                )
+                ->hint(__('Leave it blank to auto generate'))
+                ->translateLabel(),
+            TextInput::make('quantity')
+                ->translateLabel()
+                ->numeric()
+                ->required(),
+            TextInput::make('unit')
+                ->translateLabel()
+                ->required(),
+            TextInput::make('price_per_unit')
+                ->translateLabel()
+                ->mask(RawJs::make('$money($input)'))
+                ->stripCharacters(',')
+                ->numeric()
+                ->prefix(Setting::get('currency', 'IDR'))
+                ->required(),
+        ];
+    }
+
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([
-                TextInput::make('name')
-                    ->translateLabel()
-                    ->required(),
-                TextInput::make('sku')
-                    ->unique(
-                        ignoreRecord: true
-                    )
-                    ->hint(__('Leave it blank to auto generate'))
-                    ->translateLabel(),
-                TextInput::make('quantity')
-                    ->translateLabel()
-                    ->numeric()
-                    ->required(),
-                TextInput::make('unit')
-                    ->translateLabel()
-                    ->required(),
-                TextInput::make('price_per_unit')
-                    ->translateLabel()
-                    ->mask(RawJs::make('$money($input)'))
-                    ->stripCharacters(',')
-                    ->numeric()
-                    ->prefix(Setting::get('currency', 'IDR'))
-                    ->required(),
-            ]);
+            ->schema(static::getForm());
     }
 
     public static function table(Table $table): Table

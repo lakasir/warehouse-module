@@ -10,13 +10,8 @@ class Product extends TenantsProduct
 {
     use HasFactory;
 
-    public function productionRecipes(): HasMany
+    public function productionRecipeItems(): HasMany
     {
-        return $this->hasMany(ProductionRecipe::class);
-    }
-
-    public function rawMaterials(): HasMany
-    {
-        return $this->hasMany(RawMaterial::class);
+        return $this->hasMany(ProductionRecipeItem::class);
     }
 }

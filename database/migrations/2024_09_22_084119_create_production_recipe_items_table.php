@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('production_recipe_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('production_recipe_id')->constrained();
+            $table->foreignId('product_id')->constrained();
             $table->foreignId('raw_material_id')->constrained();
-            $table->integer('quantity_required');
+            $table->float('quantity_required');
             $table->timestamps();
         });
     }

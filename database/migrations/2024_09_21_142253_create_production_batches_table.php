@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('production_batches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('production_recipe_id')->constrained();
+            $table->foreignId('product_id')->constrained();
             $table->integer('quantity_produced');
             $table->double('total_cost');
             $table->timestamps();
