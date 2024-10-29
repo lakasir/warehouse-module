@@ -2,11 +2,18 @@
 
 namespace Modules\Warehouse\Filament\Resources;
 
+use Filament\Infolists\Infolist;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Lakasir\LakasirModule\Abstracts\ModuleResource;
+use Modules\Warehouse\Consts\ProductionBatchType;
+use Modules\Warehouse\Filament\Actions\ProductionAction;
 use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\Pages;
+use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\RelationManagers\ProductionBathcesRelationManager;
+use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\RelationManagers\ProductionRecipeItemsRelationManager;
 use Modules\Warehouse\Models\Product;
 
 class ProductionRecipeResource extends ModuleResource
@@ -31,18 +38,29 @@ class ProductionRecipeResource extends ModuleResource
                 TextColumn::make('name')
                     ->searchable()
                     ->translateLabel(),
+                TextColumn::make('production_batches_count')
+                    ->counts([
+                        'productionBatches' => fn (Builder $builder) => $builder->whereNot('status', ProductionBatchType::finished),
+                    ])
+                    ->label(__('Warehouse::app.production_batches.total_bacthes')),
             ])
             ->actions([
-                Action::make('production')
-                    ->icon('heroicon-s-megaphone')
-                    ->label(__('Warehouse::app.production_recipe.production')),
+                ViewAction::make(),
+                ProductionAction::make(Action::class),
             ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+        ]);
     }
 
     public static function getRelations(): array
     {
         return [
-            //
+            ProductionRecipeItemsRelationManager::class,
+            ProductionBathcesRelationManager::class,
         ];
     }
 

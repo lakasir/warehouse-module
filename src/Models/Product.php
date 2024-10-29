@@ -14,4 +14,9 @@ class Product extends TenantsProduct
     {
         return $this->hasMany(ProductionRecipeItem::class);
     }
+
+    public function productionBatches(): HasMany
+    {
+        return $this->hasMany(ProductionBatch::class);
+    }
 }

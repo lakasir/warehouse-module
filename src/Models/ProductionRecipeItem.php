@@ -4,7 +4,7 @@ namespace Modules\Warehouse\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductionRecipeItem extends Model
 {
@@ -12,8 +12,8 @@ class ProductionRecipeItem extends Model
 
     protected $guarded = ['id'];
 
-    public function rawMaterials(): HasMany
+    public function rawMaterial(): BelongsTo
     {
-        return $this->hasMany(RawMaterial::class);
+        return $this->belongsTo(RawMaterial::class);
     }
 }
