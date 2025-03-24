@@ -2,7 +2,7 @@
 
 namespace Modules\Warehouse\Consts;
 
-use App\Constants\ConstanstAbstraction;
+use Sheenazien8\Konstantiq\ConstanstAbstraction;
 
 class ProductionBatchType extends ConstanstAbstraction
 {
