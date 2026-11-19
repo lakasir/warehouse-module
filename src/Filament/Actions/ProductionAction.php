@@ -15,6 +15,7 @@ use Illuminate\Support\HtmlString;
 use Modules\Warehouse\Models\Product;
 use Modules\Warehouse\Models\ProductionBatch;
 use Modules\Warehouse\Models\ProductionRecipeItem;
+use Modules\Warehouse\Support\Money;
 
 class ProductionAction
 {
@@ -33,8 +34,21 @@ class ProductionAction
                 return self::form($product);
             })
             ->action(function (array $data, Product $product) {
+                $qty = max(1, (int) $data['quantity_produced']);
+
+                $porsiCost = 0;
+
+                foreach ($product->productionRecipeItems as $productionRecipeItem) {
+                    $porsiCost += $productionRecipeItem->rawMaterial?->costFor(
+                        (float) $productionRecipeItem->quantity_required,
+                        $productionRecipeItem->quantity_unit ?? $productionRecipeItem->rawMaterial->base_unit,
+                    ) ?? 0;
+                }
+
                 ProductionBatch::create(array_merge($data, [
                     'product_id' => $product->id,
+                    'quantity_produced' => $qty,
+                    'total_cost' => $porsiCost * $qty,
                 ]));
 
                 notification()->title(__('Warehouse::app.production_batches.succcess'));
@@ -49,12 +63,15 @@ class ProductionAction
 
     public static function form(Product $product): array
     {
-        $praTotalCost = 0;
+        // Cost of the recipe for ONE produced unit.
+        $porsiCost = 0;
 
         /** @var ProductionRecipeItem $productionRecipeItem */
         foreach ($product->productionRecipeItems as $productionRecipeItem) {
-            $costPerRawMaterial = $productionRecipeItem->rawMaterial->price_per_unit * $productionRecipeItem->quantity_required;
-            $praTotalCost += $costPerRawMaterial;
+            $porsiCost += $productionRecipeItem->rawMaterial?->costFor(
+                (float) $productionRecipeItem->quantity_required,
+                $productionRecipeItem->quantity_unit ?? $productionRecipeItem->rawMaterial->base_unit,
+            ) ?? 0;
         }
 
         return [
@@ -62,12 +79,17 @@ class ProductionAction
                 ->label(__('Warehouse::app.production_batches.quantity_produced'))
                 ->helperText(__('Warehouse::app.production_batches.quantity_produced_placeholder'))
                 ->numeric()
+                ->minValue(1)
+                ->default(1)
+                ->live(onBlur: true)
                 ->suffix(str($product->unit)->upper())
                 ->required(),
             Split::make([
                 PriceInput::make('total_cost')
                     ->readOnly()
-                    ->default($praTotalCost)
+                    ->default($porsiCost)
+                    ->formatStateUsing(fn ($state) => $state ?? $porsiCost)
+                    ->helperText(__('Recipe cost for the whole batch at the quantity produced'))
                     ->label(__('Warehouse::app.production_batches.total_cost_placeholder')),
                 PriceInput::make('added_cost')
                     ->label(__('Warehouse::app.production_batches.added_cost'))
@@ -84,10 +106,23 @@ class ProductionAction
             Toggle::make('complete_price')
                 ->live()
                 ->label(__('Warehouse::app.production_batches.complete_price_placeholder')),
+            Placeholder::make('hpp_placeholder_content')
+                ->content(function (Get $get) use ($porsiCost, $product) {
+                    $qty = max(1, (int) $get('quantity_produced'));
+                    $batchCost = ($porsiCost * $qty) + Money::toFloat($get('added_cost'));
+
+                    return new HtmlString(
+                        "<p class='text-xl font-semibold'>".price_format($batchCost / $qty)
+                        .' <span class="text-sm font-normal">/ '.strtoupper((string) $product->unit).'</span></p>'
+                    );
+                })
+                ->label(__('HPP per unit')),
             Placeholder::make('total_cost_placeholder_content')
-                ->content(function (Get $get) use ($praTotalCost) {
-                    $totalCost = $praTotalCost + price_string_to_float($get('added_cost') ?? '0');
-                    $estimationSellingPrice = $totalCost + ($totalCost * (float) $get('margin') / 100);
+                ->content(function (Get $get) use ($porsiCost, $product) {
+                    $qty = max(1, (int) $get('quantity_produced'));
+                    $totalCost = ($porsiCost * $qty) + Money::toFloat($get('added_cost'));
+                    $hpp = $totalCost / $qty;
+                    $estimationSellingPrice = $hpp * (1 + (float) $get('margin') / 100);
 
                     if ($get('complete_price')) {
                         $estimationSellingPrice = self::roundUpToNearest500($estimationSellingPrice);

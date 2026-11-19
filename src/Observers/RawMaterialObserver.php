@@ -12,6 +12,17 @@ class RawMaterialObserver
         if (! $rawMaterial->sku) {
             $rawMaterial->sku = $this->generateSku($rawMaterial);
         }
+
+        $rawMaterial->recalculateBaseUnitPrice();
+    }
+
+    public function updating(RawMaterial $rawMaterial)
+    {
+        $dirty = $rawMaterial->getDirty();
+
+        if (array_intersect(array_keys($dirty), ['input_qty', 'input_unit', 'harga_total', 'base_quantity_override', 'base_unit'])) {
+            $rawMaterial->recalculateBaseUnitPrice();
+        }
     }
 
     private function generateSku(RawMaterial $rawMaterial): string
