@@ -27,8 +27,8 @@ class ProductionRecipeItemsRelationManager extends RelationManager
             Select::make('raw_material_id')
                 ->live(debounce: 500)
                 ->searchable()
-                ->options(fn (?ProductionRecipeItem $record, ?RelationManager $livewire) => self::availableRawMaterials($record, $livewire))
-                ->rule(fn (?ProductionRecipeItem $record, ?RelationManager $livewire) => function (string $attribute, $value, \Closure $fail) use ($record, $livewire) {
+                ->options(fn (?ProductionRecipeItem $record, mixed $livewire = null) => self::availableRawMaterials($record, $livewire))
+                ->rule(fn (?ProductionRecipeItem $record, mixed $livewire = null) => function (string $attribute, $value, \Closure $fail) use ($record, $livewire) {
                     if (self::isAlreadyOnRecipe((int) $value, $record, $livewire)) {
                         $fail(__('This raw material is already on the recipe.'));
                     }
@@ -113,11 +113,34 @@ class ProductionRecipeItemsRelationManager extends RelationManager
     }
 
     /**
+     * The recipe's product. The form is shared with the Create page and with
+     * the Product form extension, where there is no relation manager to ask.
+     */
+    private static function productIdFor(mixed $livewire): ?int
+    {
+        $owner = method_exists($livewire, 'getOwnerRecord')
+            ? $livewire->getOwnerRecord()
+            : null;
+
+        if ($owner) {
+            return (int) $owner->getKey();
+        }
+
+        $state = method_exists($livewire, 'getState') ? $livewire->getState() : null;
+
+        if (is_array($state) && ! empty($state['product_id'])) {
+            return (int) $state['product_id'];
+        }
+
+        return null;
+    }
+
+    /**
      * Whether a material already has a line on the recipe being edited.
      */
     private static function isAlreadyOnRecipe(int $rawMaterialId, ?ProductionRecipeItem $record, mixed $livewire): bool
     {
-        $productId = $livewire?->getOwnerRecord()?->getKey();
+        $productId = self::productIdFor($livewire);
 
         if (! $productId) {
             return false;
@@ -156,7 +179,7 @@ class ProductionRecipeItemsRelationManager extends RelationManager
 
     private static function availableRawMaterials(?ProductionRecipeItem $record, mixed $livewire): array
     {
-        $productId = $livewire?->getOwnerRecord()?->getKey();
+        $productId = self::productIdFor($livewire);
 
         $used = ProductionRecipeItem::query()
             ->when($productId, fn ($query) => $query->where('product_id', $productId))
