@@ -12,6 +12,11 @@ class ProductionRecipeItem extends Model
 
     protected $guarded = ['id'];
 
+    public function recipe(): BelongsTo
+    {
+        return $this->belongsTo(ProductionRecipe::class, 'production_recipe_id');
+    }
+
     public function rawMaterial(): BelongsTo
     {
         return $this->belongsTo(RawMaterial::class);

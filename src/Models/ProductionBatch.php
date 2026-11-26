@@ -77,4 +77,9 @@ class ProductionBatch extends Model
     {
         return $this->belongsTo(Stock::class);
     }
+
+    public function recipe(): BelongsTo
+    {
+        return $this->belongsTo(ProductionRecipe::class, 'production_recipe_id');
+    }
 }
