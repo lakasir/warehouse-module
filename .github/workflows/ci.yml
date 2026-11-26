@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer, pint
+
+      - run: composer validate --no-check-publish
+
+      - run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - run: pint --test
+
+      - name: Lint PHP
+        run: find src config database routes -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Release archive installs like a module
+        run: |
+          zip -qr "$RUNNER_TEMP/module.zip" composer.json composer.lock config database lang resources routes src
+          unzip -l "$RUNNER_TEMP/module.zip" | grep -q ' composer.json$'
+          unzip -l "$RUNNER_TEMP/module.zip" | grep -q ' src/WarehouseServiceProvider.php$'
+          rm -rf "$RUNNER_TEMP/unpacked" && mkdir -p "$RUNNER_TEMP/unpacked"
+          unzip -q "$RUNNER_TEMP/module.zip" -d "$RUNNER_TEMP/unpacked"
+          composer install --no-interaction --no-progress --no-dev --working-dir="$RUNNER_TEMP/unpacked"

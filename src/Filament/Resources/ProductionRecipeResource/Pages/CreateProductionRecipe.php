@@ -6,8 +6,8 @@ use App\Filament\Tenant\Resources\Traits\RedirectToIndex;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Get;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -66,7 +66,7 @@ class CreateProductionRecipe extends CreateRecord
             fn ($row) => ! empty($row['raw_material_id']),
         ));
 
-        return (new ProductionRecipeService())->create(
+        return (new ProductionRecipeService)->create(
             (int) $data['product_id'],
             $data['name'],
             $rows,

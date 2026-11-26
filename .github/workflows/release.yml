@@ -1,0 +1,46 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer
+
+      - name: Stamp the tag as the module version
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          jq --arg v "$V" '.version = $v' composer.json > composer.tmp
+          mv composer.tmp composer.json
+          composer update --lock --no-install --no-interaction --no-progress
+
+      - name: Build release archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/archive"
+          zip -qr "$RUNNER_TEMP/archive/warehouse-${GITHUB_REF_NAME}.zip" \
+            composer.json composer.lock config database lang resources routes src
+
+      - name: The module installer can read and build it
+        run: |
+          ARCHIVE="$RUNNER_TEMP/archive/warehouse-${GITHUB_REF_NAME}.zip"
+          unzip -l "$ARCHIVE" | grep -q ' composer.json$'
+          unzip -l "$ARCHIVE" | grep -q ' src/WarehouseServiceProvider.php$'
+          rm -rf "$RUNNER_TEMP/unpacked" && mkdir -p "$RUNNER_TEMP/unpacked"
+          unzip -q "$ARCHIVE" -d "$RUNNER_TEMP/unpacked"
+          composer install --no-interaction --no-progress --no-dev --working-dir="$RUNNER_TEMP/unpacked"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/archive/warehouse-*.zip

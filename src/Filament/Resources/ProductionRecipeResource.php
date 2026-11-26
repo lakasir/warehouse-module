@@ -64,7 +64,7 @@ class ProductionRecipeResource extends ModuleResource
                             ->maxLength(255),
                     ])
                     ->action(function (ProductionRecipe $record, array $data) {
-                        $copy = (new ProductionRecipeService())->duplicate($record, $data['name']);
+                        $copy = (new ProductionRecipeService)->duplicate($record, $data['name']);
 
                         Notification::make()->success()->title(__('Warehouse::app.production_recipe.duplicated'))->send();
 
