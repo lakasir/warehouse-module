@@ -9,12 +9,12 @@ use Filament\Forms\Components\Split;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
+use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action as ActionsAction;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\HtmlString;
-use Modules\Warehouse\Models\Product;
 use Modules\Warehouse\Models\ProductionBatch;
-use Modules\Warehouse\Models\ProductionRecipeItem;
+use Modules\Warehouse\Models\ProductionRecipe;
 use Modules\Warehouse\Support\Money;
 
 class ProductionAction
@@ -30,28 +30,23 @@ class ProductionAction
             ->icon('heroicon-s-megaphone')
             ->label(__('Warehouse::app.production_recipe.production'))
             ->modal()
-            ->form(function (Product $product) {
-                return self::form($product);
+            ->form(function (ProductionRecipe $recipe) {
+                return self::form($recipe);
             })
-            ->action(function (array $data, Product $product) {
+            ->action(function (array $data, ProductionRecipe $recipe) {
                 $qty = max(1, (int) $data['quantity_produced']);
 
-                $porsiCost = 0;
-
-                foreach ($product->productionRecipeItems as $productionRecipeItem) {
-                    $porsiCost += $productionRecipeItem->rawMaterial?->costFor(
-                        (float) $productionRecipeItem->quantity_required,
-                        $productionRecipeItem->quantity_unit ?? $productionRecipeItem->rawMaterial->base_unit,
-                    ) ?? 0;
-                }
-
                 ProductionBatch::create(array_merge($data, [
-                    'product_id' => $product->id,
+                    'product_id' => $recipe->product_id,
+                    'production_recipe_id' => $recipe->id,
                     'quantity_produced' => $qty,
-                    'total_cost' => $porsiCost * $qty,
+                    'total_cost' => $recipe->costPerUnit() * $qty,
                 ]));
 
-                notification()->title(__('Warehouse::app.production_batches.succcess'));
+                Notification::make()
+                    ->success()
+                    ->title(__('Warehouse::app.production_batches.succcess'))
+                    ->send();
             })
             ->closeModalByClickingAway(false);
     }
@@ -61,18 +56,11 @@ class ProductionAction
         return ceil($price / 500) * 500;
     }
 
-    public static function form(Product $product): array
+    public static function form(ProductionRecipe $recipe): array
     {
-        // Cost of the recipe for ONE produced unit.
-        $porsiCost = 0;
-
-        /** @var ProductionRecipeItem $productionRecipeItem */
-        foreach ($product->productionRecipeItems as $productionRecipeItem) {
-            $porsiCost += $productionRecipeItem->rawMaterial?->costFor(
-                (float) $productionRecipeItem->quantity_required,
-                $productionRecipeItem->quantity_unit ?? $productionRecipeItem->rawMaterial->base_unit,
-            ) ?? 0;
-        }
+        $recipe->loadMissing('items.rawMaterial', 'product');
+        $product = $recipe->product;
+        $porsiCost = $recipe->costPerUnit();
 
         return [
             TextInput::make('quantity_produced')
@@ -82,7 +70,7 @@ class ProductionAction
                 ->minValue(1)
                 ->default(1)
                 ->live(onBlur: true)
-                ->suffix(str($product->unit)->upper())
+                ->suffix(str($product?->unit)->upper())
                 ->required(),
             Split::make([
                 PriceInput::make('total_cost')
@@ -113,12 +101,12 @@ class ProductionAction
 
                     return new HtmlString(
                         "<p class='text-xl font-semibold'>".price_format($batchCost / $qty)
-                        .' <span class="text-sm font-normal">/ '.strtoupper((string) $product->unit).'</span></p>'
+                        .' <span class="text-sm font-normal">/ '.strtoupper((string) $product?->unit).'</span></p>'
                     );
                 })
                 ->label(__('HPP per unit')),
             Placeholder::make('total_cost_placeholder_content')
-                ->content(function (Get $get) use ($porsiCost, $product) {
+                ->content(function (Get $get) use ($porsiCost) {
                     $qty = max(1, (int) $get('quantity_produced'));
                     $totalCost = ($porsiCost * $qty) + Money::toFloat($get('added_cost'));
                     $hpp = $totalCost / $qty;

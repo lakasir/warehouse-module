@@ -12,6 +12,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Colors\Color;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -56,9 +57,9 @@ class ProductionBathcesRelationManager extends RelationManager
                     ->suffix('%'),
                 Tables\Columns\TextColumn::make('complete_price')
                     ->formatStateUsing(fn ($state) => $state ? __('Yes') : __('No'))
-                    ->color(fn ($state) => match ($state) {
-                        0 => 'primary',
-                        1 => 'success',
+                    ->color(fn ($state) => match ((bool) $state) {
+                        false => 'primary',
+                        true => 'success',
                     }),
                 PriceTextColumn::make('estimation_selling_price'),
             ])
@@ -86,7 +87,7 @@ class ProductionBathcesRelationManager extends RelationManager
                                 $qtyProduced = max(1, (int) $productionBatch->quantity_produced);
                                 $hppPerUnit = ($productionBatch->total_cost + $productionBatch->added_cost) / $qtyProduced;
 
-                                foreach ($product->productionRecipeItems as $productRecipe) {
+                                foreach (($productionBatch->recipe?->items ?? $product->productionRecipeItems) as $productRecipe) {
                                     $recipeUnit = $productRecipe->quantity_unit ?? $productRecipe->rawMaterial->base_unit;
                                     $perUnit = $productRecipe->rawMaterial->toBaseUnits((float) $productRecipe->quantity_required, $recipeUnit) ?? 0;
                                     $totalMaterialUsed = $perUnit * $productionBatch->quantity_produced;
@@ -109,7 +110,7 @@ class ProductionBathcesRelationManager extends RelationManager
 
                             $productionBatch->save();
 
-                            notification()
+                            Notification::make()
                                 ->title(__('Success'))
                                 ->body(__('actions.named.update', [
                                     'name' => 'status',

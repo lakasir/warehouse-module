@@ -2,25 +2,24 @@
 
 namespace Modules\Warehouse\Filament\Resources;
 
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Lakasir\LakasirModule\Abstracts\ModuleResource;
-use Modules\Warehouse\Consts\ProductionBatchType;
 use Modules\Warehouse\Filament\Actions\ProductionAction;
-use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\RelationManagers\ProductionRecipeItemsRelationManager;
 use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\Pages;
 use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\RelationManagers\ProductionBathcesRelationManager;
-use Modules\Warehouse\Models\Product;
-use Modules\Warehouse\Models\ProductionRecipeItem;
+use Modules\Warehouse\Filament\Resources\ProductionRecipeResource\RelationManagers\ProductionRecipeItemsRelationManager;
+use Modules\Warehouse\Models\ProductionRecipe;
+use Modules\Warehouse\Services\ProductionRecipeService;
 
 class ProductionRecipeResource extends ModuleResource
 {
-    protected static ?string $model = Product::class;
+    protected static ?string $model = ProductionRecipe::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
@@ -32,40 +31,44 @@ class ProductionRecipeResource extends ModuleResource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function () {
-                return Product::query()->whereHas('productionRecipeItems');
-            })
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
                     ->translateLabel(),
-                TextColumn::make('production_batches_count')
-                    ->counts([
-                        'productionBatches' => fn (Builder $builder) => $builder->whereNot('status', ProductionBatchType::finished),
-                    ])
-                    ->label(__('Warehouse::app.production_batches.total_bacthes')),
+                TextColumn::make('product.name')
+                    ->searchable()
+                    ->translateLabel(),
+                TextColumn::make('items_count')
+                    ->counts('items')
+                    ->label(__('Warehouse::app.production_recipe.items_count')),
+                TextColumn::make('cost_per_unit')
+                    ->getStateUsing(fn (ProductionRecipe $record) => price_format($record->costPerUnit()))
+                    ->label(__('Warehouse::app.production_recipe.cost_per_unit')),
             ])
             ->actions([
                 ViewAction::make(),
-                Action::make('add_ingredient')
-                    ->label(__('Add to recipe'))
-                    ->icon('heroicon-o-plus')
-                    ->modalHeading(fn (Product $record) => __('Add to recipe').': '.$record->name)
-                    ->form(ProductionRecipeItemsRelationManager::getDefaultForm())
-                    ->action(function (Product $record, array $data) {
-                        // The app's Product model has no recipe relation; it
-                        // lives on the module's subclass, so write the row
-                        // directly rather than through a relation method that
-                        // may not exist on the resolved model.
-                        ProductionRecipeItem::query()->create([
-                            'product_id' => $record->getKey(),
-                            'raw_material_id' => $data['raw_material_id'],
-                            'quantity_required' => (float) $data['quantity_required'],
-                            'quantity_unit' => $data['quantity_unit'] ?? null,
-                        ]);
+                Action::make('duplicate')
+                    ->label(__('Duplicate'))
+                    ->icon('heroicon-o-document-duplicate')
+                    ->form(fn (ProductionRecipe $record) => [
+                        TextInput::make('name')
+                            ->label(__('Warehouse::app.production_recipe.name'))
+                            ->default($record->name.' (copy)')
+                            ->rule(fn () => function (string $attribute, $value, \Closure $fail) use ($record) {
+                                if (ProductionRecipe::nameIsTaken((int) $record->product_id, $value)) {
+                                    $fail(__('Warehouse::app.production_recipe.name_taken'));
+                                }
+                            })
+                            ->required()
+                            ->maxLength(255),
+                    ])
+                    ->action(function (ProductionRecipe $record, array $data) {
+                        $copy = (new ProductionRecipeService())->duplicate($record, $data['name']);
 
-                        Notification::make()->success()->title(__('Recipe updated'))->send();
+                        Notification::make()->success()->title(__('Warehouse::app.production_recipe.duplicated'))->send();
+
+                        return redirect(ProductionRecipeResource::getUrl('view', ['record' => $copy]));
                     }),
                 ProductionAction::make(Action::class),
             ]);
@@ -73,8 +76,7 @@ class ProductionRecipeResource extends ModuleResource
 
     public static function infolist(Infolist $infolist): Infolist
     {
-        return $infolist->schema([
-        ]);
+        return $infolist->schema([]);
     }
 
     public static function getRelations(): array

@@ -8,18 +8,21 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Modules\Warehouse\Filament\Resources\RawMaterialResource;
+use Modules\Warehouse\Models\ProductionRecipe;
 use Modules\Warehouse\Models\ProductionRecipeItem;
 use Modules\Warehouse\Models\RawMaterial;
 
 class ProductionRecipeItemsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'productionRecipeItems';
+    protected static string $relationship = 'items';
 
     public static function getDefaultForm(): array
     {
@@ -39,8 +42,6 @@ class ProductionRecipeItemsRelationManager extends RelationManager
                     return RawMaterial::create($data)->id;
                 })
                 ->afterStateUpdated(function ($state, Get $get, Set $set) {
-                    // The unit list depends on the chosen material, so reset the
-                    // unit to that material's own and reprice with it.
                     $rawMaterial = RawMaterial::find($state);
 
                     if (! $rawMaterial) {
@@ -96,8 +97,6 @@ class ProductionRecipeItemsRelationManager extends RelationManager
                 }),
             PriceInput::make('price_per_need')
                 ->readOnly()
-                // `price_per_need` is derived, not a column: compute it so the
-                // field is not empty (and required-blocking) when editing.
                 ->formatStateUsing(function ($state, ?ProductionRecipeItem $record) {
                     if ($record?->exists && $record->rawMaterial) {
                         return $record->rawMaterial->costFor(
@@ -108,59 +107,41 @@ class ProductionRecipeItemsRelationManager extends RelationManager
 
                     return $state;
                 }),
-
         ];
     }
 
     /**
-     * The recipe's product. The form is shared with the Create page and with
-     * the Product form extension, where there is no relation manager to ask.
+     * The recipe being edited. The form is shared with the Create page, where
+     * there is no relation manager to ask.
      */
-    private static function productIdFor(mixed $livewire): ?int
+    private static function recipeIdFor(mixed $livewire): ?int
     {
         $owner = method_exists($livewire, 'getOwnerRecord')
             ? $livewire->getOwnerRecord()
             : null;
 
-        if ($owner) {
+        if ($owner instanceof ProductionRecipe) {
             return (int) $owner->getKey();
-        }
-
-        $state = method_exists($livewire, 'getState') ? $livewire->getState() : null;
-
-        if (is_array($state) && ! empty($state['product_id'])) {
-            return (int) $state['product_id'];
         }
 
         return null;
     }
 
-    /**
-     * Whether a material already has a line on the recipe being edited.
-     */
     private static function isAlreadyOnRecipe(int $rawMaterialId, ?ProductionRecipeItem $record, mixed $livewire): bool
     {
-        $productId = self::productIdFor($livewire);
+        $recipeId = self::recipeIdFor($livewire);
 
-        if (! $productId) {
+        if (! $recipeId) {
             return false;
         }
 
         return ProductionRecipeItem::query()
-            ->where('product_id', $productId)
+            ->where('production_recipe_id', $recipeId)
             ->where('raw_material_id', $rawMaterialId)
             ->when($record?->exists, fn ($query) => $query->whereKeyNot($record->getKey()))
             ->exists();
     }
 
-    /**
-     * Raw materials that may still be added to this product's recipe.
-     *
-     * A material already on the recipe is filtered out so the same ingredient
-     * cannot appear twice; the row being edited keeps its own value visible.
-     *
-     * @return array<int|string, string>
-     */
     /**
      * Turn a duplicate-material insert into a field error instead of letting
      * the unique index surface as a 500.
@@ -169,8 +150,8 @@ class ProductionRecipeItemsRelationManager extends RelationManager
     {
         try {
             parent::create();
-        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
-            \Filament\Notifications\Notification::make()
+        } catch (UniqueConstraintViolationException) {
+            Notification::make()
                 ->danger()
                 ->title(__('This raw material is already on the recipe.'))
                 ->send();
@@ -179,10 +160,10 @@ class ProductionRecipeItemsRelationManager extends RelationManager
 
     private static function availableRawMaterials(?ProductionRecipeItem $record, mixed $livewire): array
     {
-        $productId = self::productIdFor($livewire);
+        $recipeId = self::recipeIdFor($livewire);
 
         $used = ProductionRecipeItem::query()
-            ->when($productId, fn ($query) => $query->where('product_id', $productId))
+            ->when($recipeId, fn ($query) => $query->where('production_recipe_id', $recipeId))
             ->when($record?->exists, fn ($query) => $query->whereKeyNot($record->getKey()))
             ->pluck('raw_material_id')
             ->all();
@@ -196,9 +177,6 @@ class ProductionRecipeItemsRelationManager extends RelationManager
 
     public function form(Form $form): Form
     {
-        // One field per row: `getDefaultForm()` is also used inline by the
-        // recipe repeater, where a Split reads well, but this create/edit
-        // modal needs the fields stacked.
         return $form
             ->columns(1)
             ->schema(static::getDefaultForm());
@@ -223,7 +201,10 @@ class ProductionRecipeItemsRelationManager extends RelationManager
                     ->label(__('Warehouse::app.production_recipe.price_per_need')),
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->mutateFormDataUsing(fn (array $data) => array_merge($data, [
+                        'production_recipe_id' => $this->getOwnerRecord()->getKey(),
+                    ])),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
@@ -239,7 +220,7 @@ class ProductionRecipeItemsRelationManager extends RelationManager
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        return __('Warehouse::app.production_recipe.title');
+        return __('Warehouse::app.production_recipe.ingredients');
     }
 
     public function isReadOnly(): bool

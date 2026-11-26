@@ -13,6 +13,13 @@ return [
         'show' => 'Lihat Resep Produksi :product',
         'quantity_required' => 'Bahan yang dibutuhkan',
         'raw_material' => 'Bahan baku',
+        'name' => 'Nama resep',
+        'name_placeholder' => 'Misal ayam dada potong 12',
+        'name_taken' => 'Produk ini sudah punya resep dengan nama tersebut.',
+        'duplicated' => 'Resep berhasil diduplikat',
+        'items_count' => 'Jumlah bahan',
+        'cost_per_unit' => 'Biaya per unit',
+        'ingredients' => 'Bahan-bahan',
         'price_per_need' => 'Biaya yang dibutuhkan',
     ],
     'production_batches' => [

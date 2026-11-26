@@ -3,6 +3,8 @@
 namespace Modules\Warehouse\Filament\Resources\ProductionRecipeResource\Pages;
 
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Modules\Warehouse\Filament\Actions\ProductionAction;
@@ -16,15 +18,39 @@ class ViewProductionRecipe extends ViewRecord
 
     public function getTitle(): string|Htmlable
     {
-        return __('Warehouse::app.production_recipe.show', [
-            'product' => $this->record->name,
-        ]);
+        return $this->record->name;
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return $this->record->product?->name;
     }
 
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('rename')
+                ->label(__('Rename'))
+                ->icon('heroicon-o-pencil-square')
+                ->form([
+                    TextInput::make('name')
+                        ->label(__('Warehouse::app.production_recipe.name'))
+                        ->default(fn () => $this->record->name)
+                        ->rule(function () {
+                            $record = $this->record;
+
+                            return function (string $attribute, $value, \Closure $fail) use ($record) {
+                                if (ProductionRecipe::nameIsTaken((int) $record->product_id, $value, (int) $record->getKey())) {
+                                    $fail(__('Warehouse::app.production_recipe.name_taken'));
+                                }
+                            };
+                        })
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->action(fn (array $data) => $this->record->update(['name' => $data['name']])),
             ProductionAction::make(Action::class),
+            DeleteAction::make(),
         ];
     }
 

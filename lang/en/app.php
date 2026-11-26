@@ -13,6 +13,13 @@ return [
         'show' => 'View Production Recipe for :product',
         'quantity_required' => 'Quantity required',
         'raw_material' => 'Raw material',
+        'name' => 'Recipe name',
+        'name_placeholder' => 'e.g. Chicken breast cut 12',
+        'name_taken' => 'This product already has a recipe with that name.',
+        'duplicated' => 'Recipe duplicated',
+        'items_count' => 'Ingredients',
+        'cost_per_unit' => 'Cost per unit',
+        'ingredients' => 'Ingredients',
         'price_per_need' => 'Price per need',
     ],
     'production_batches' => [
